@@ -1,0 +1,26 @@
+version: 2
+
+sources:
+  - name: seamark
+    description: >
+      Tables loaded straight from Project 2's own cleaned_data/ and
+      outputs/ CSVs by warehouse/build_duckdb.py. This isn't a second
+      copy of the data with its own life, it's the exact same numbers
+      the pipeline already produced and the test suite already checked,
+      just made queryable with SQL.
+    schema: main
+    tables:
+      - name: products_clean
+        description: Stage 1's cleaned product catalog, one row per product.
+      - name: order_line_items_clean
+        description: One row per line item across all real orders.
+      - name: orders_clean
+        description: >
+          One row per real order. Loaded here only for financial and
+          logistics columns, see stg_orders.sql for what's deliberately
+          left out and why.
+      - name: catalog_vs_sales_mix
+        description: >
+          Stage 9's own catalog-vs-sales output (analytics/09_catalog_vs_sales_mix.py),
+          kept as a source here so mart_category_sales_mix.sql's answer
+          can be compared against it directly.

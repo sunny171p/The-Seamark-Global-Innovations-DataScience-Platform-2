@@ -1,0 +1,43 @@
+# ==
+# dbt_project.yml
+# Author: Sunday Emmanuel Azeez
+# Seamark Global Innovations — Post-Launch Data Science Project (Project 2)
+# ==
+#
+# WHY THIS EXISTS:
+# analytics/09_catalog_vs_sales_mix.py already answers "how does what's
+# in the catalog compare to what people actually bought," in pandas,
+# and the test suite already checks its answer. This dbt project asks
+# the same question a second way, in SQL, against the DuckDB file that
+# warehouse/build_duckdb.py builds from the exact same CSVs. Two tools,
+# same source data, same answer, that's the point: it's another form of
+# the independent-verification habit the rest of this project already
+# follows, not a replacement for the pandas version.
+#
+# HOW TO RUN IT:
+#   pip install -r dbt_seamark/requirements.txt
+#   python warehouse/build_duckdb.py     (build the DuckDB file first)
+#   cd dbt_seamark
+#   export DBT_PROFILES_DIR=.            (Windows PowerShell: $env:DBT_PROFILES_DIR = ".")
+#   dbt run
+#   dbt test
+#   dbt docs generate && dbt docs serve  (browsable lineage graph + docs)
+
+name: "seamark_dbt"
+version: "1.0.0"
+config-version: 2
+
+profile: "seamark_dbt"
+
+model-paths: ["models"]
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  seamark_dbt:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table

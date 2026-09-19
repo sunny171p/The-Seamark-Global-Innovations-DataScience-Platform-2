@@ -1,0 +1,2 @@
+website_sessions,website_orders,website_conversion_rate_pct,website_window,google_shopping_clicks,google_shopping_purchases,google_shopping_window,data_source_note
+695,7,1.007,2026-08-01 to 2026-09-14,0,0,"rolling last 28 days, observed 2026-09-15",Google Shopping figures manually read from Merchant Center dashboard - no CSV export available

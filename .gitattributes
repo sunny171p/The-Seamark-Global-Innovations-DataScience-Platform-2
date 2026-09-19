@@ -1,0 +1,13 @@
+# Keeps text files (code, CSV, config) using LF line endings in this
+# repository no matter which OS or editor touches them. Without this,
+# a script re-run on Windows silently flips every line ending to CRLF,
+# which git then reports as every line in the file having "changed"
+# even though the actual data is identical, exactly what happened to
+# cleaned_data/, outputs/, and raw_data/ before this file was added.
+* text=auto eol=lf
+
+# Real binary files should never go through text normalization.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.duckdb binary

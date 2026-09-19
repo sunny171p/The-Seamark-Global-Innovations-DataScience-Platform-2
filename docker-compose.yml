@@ -1,0 +1,49 @@
+# ==
+# docker-compose.yml
+# Author: Sunday Emmanuel Azeez
+# Seamark Global Innovations — Post-Launch Data Science Project (Project 2)
+# ==
+#
+# WHY THIS EXISTS:
+# Everything else in this README's quick-start sections still works,
+# clone it, pip install, run the script. This is for the case where
+# someone doesn't want to think about their own Python version or
+# whether their pandas matches, and just wants the dashboard and the
+# API running with one command.
+#
+# This does NOT run the pipeline itself. It expects cleaned_data/ and
+# outputs/ to already exist on your machine (run `python pipeline.py`
+# locally first, same as always), and mounts those folders straight
+# into both containers read-only. Nothing about your real data ever
+# gets copied into a Docker image, see the Dockerfiles' own comments
+# and .dockerignore for why.
+#
+# USAGE:
+#   python pipeline.py                 (generates cleaned_data/ and outputs/, if you haven't already)
+#   docker compose up --build
+#   dashboard: http://localhost:8501
+#   api:       http://localhost:5050
+
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: dashboard/Dockerfile
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./cleaned_data:/app/cleaned_data:ro
+      - ./outputs:/app/outputs:ro
+      - ./raw_data:/app/raw_data:ro
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    ports:
+      - "5050:5050"
+    volumes:
+      - ./cleaned_data:/app/cleaned_data:ro
+      - ./outputs:/app/outputs:ro
+    restart: unless-stopped
