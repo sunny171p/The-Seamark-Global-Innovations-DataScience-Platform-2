@@ -1,0 +1,8 @@
+report_screen,time_period_filter,metric,value,notes
+Analytics > Summary,unspecified default period,Ads + Organic - Product clicks,0,Read directly off the Merchant Center dashboard on 2026-09-15 - no CSV export was found on this screen
+Analytics > Summary,unspecified default period,Organic - Online store clicks,4,"+300% change shown on screen; ""Online store clicks"" is a different metric than ""Product clicks"" below, not reconciled to one number"
+Products > Traffic,Last 28 days,Ads + Organic - Clicks,0,Read directly off the Merchant Center dashboard on 2026-09-15 - no CSV export was found on this screen
+Products > Traffic,Last 28 days,Ads + Organic - Impressions,<20,Displayed as "<20" by Merchant Center itself - not a precise count
+Products > Traffic,Last 28 days,Ads + Organic - CTR pct,0.0,
+Products > Traffic,Last 28 days,Organic - Purchases,0,
+Products > Traffic,Last 28 days,Organic - Purchase rate pct,0.0,

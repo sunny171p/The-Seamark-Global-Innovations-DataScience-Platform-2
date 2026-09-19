@@ -1,0 +1,2 @@
+total_visitors,total_sessions,total_orders,conversion_rate_pct,likely_bot_sessions,likely_bot_pct,adjusted_sessions,adjusted_conversion_rate_pct,gateway_variance_found,channel_variance_found,aov_gbp,scenario_lift_pct,scenario_additional_orders,scenario_additional_revenue_gbp
+628,695,7,1.007,269,38.7,426,1.643,False,False,59.61,5.0,0.35,20.86

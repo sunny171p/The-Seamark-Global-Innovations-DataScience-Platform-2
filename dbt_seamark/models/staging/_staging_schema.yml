@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: stg_products
+    description: Cleaned, renamed products_clean, one row per product.
+    columns:
+      - name: product_handle
+        description: Shopify's product handle, unique per product.
+        tests:
+          - not_null
+          - unique
+      - name: category
+        description: The auto-classified category from Stage 2 (analytics/02_product_classification.py).
+        tests:
+          - not_null
+
+  - name: stg_order_line_items
+    description: Cleaned, renamed order_line_items_clean, one row per line item.
+    columns:
+      - name: order_name
+        tests:
+          - not_null
+      - name: quantity
+        tests:
+          - not_null
+
+  - name: stg_orders
+    description: Cleaned, renamed orders_clean, Email deliberately excluded (see the model's own header comment).
+    columns:
+      - name: order_name
+        description: Shopify's order name (e.g. #1001), unique per order.
+        tests:
+          - not_null
+          - unique

@@ -1,0 +1,9 @@
+# See requirements.txt at the project root for why these are ranges,
+# not exact pins.
+requests>=2.31,<3.0
+pandas>=2.2,<3.0
+python-dotenv>=1.0,<2.0
+
+# added for webhook_listener.py -- the same Flask already used by api/,
+# just running a second, much smaller app on its own port
+flask>=3.0,<4.0

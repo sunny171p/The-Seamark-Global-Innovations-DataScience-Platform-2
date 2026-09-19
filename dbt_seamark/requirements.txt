@@ -1,0 +1,6 @@
+# Installs dbt with the DuckDB adapter. Kept in its own file, separate
+# from the project's root requirements.txt, on purpose: dbt pulls in a
+# fair number of its own pinned dependencies, and isolating them here
+# means installing dbt can never quietly change what the core pipeline
+# runs with.
+dbt-duckdb>=1.8,<2.0

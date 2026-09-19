@@ -1,0 +1,24 @@
+# ==
+# profiles.yml
+# Author: Sunday Emmanuel Azeez
+# ==
+#
+# Kept inside the project instead of the usual ~/.dbt/profiles.yml so
+# that cloning this repo is enough to run dbt, nobody has to go set up
+# a profile in a totally different folder on their own machine first.
+# Point DBT_PROFILES_DIR at this folder before running any dbt command:
+#   export DBT_PROFILES_DIR=.            (Mac/Linux, from inside dbt_seamark/)
+#   $env:DBT_PROFILES_DIR = "."          (Windows PowerShell, same folder)
+#
+# The path below is relative to dbt_seamark/, and points at the file
+# warehouse/build_duckdb.py builds. Run that script first, or this will
+# fail with a "file not found" error, which is expected, DuckDB won't
+# create tables out of thin air.
+
+seamark_dbt:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "../warehouse/seamark.duckdb"
+      threads: 4

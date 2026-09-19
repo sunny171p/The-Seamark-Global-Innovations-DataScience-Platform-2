@@ -1,0 +1,52 @@
+# ==
+# .pre-commit-config.yaml
+# Author: Sunday Emmanuel Azeez
+# The Seamark Global Innovations Project 2
+# ==
+#
+# WHY THIS EXISTS:
+# This project keeps API keys and passwords out of GitHub, and this
+# file is what checks that automatically. It scans every file right
+# before a commit is saved. If it sees anything that looks like a
+# password or an API key, it stops the commit so no secret ever gets
+# uploaded by mistake.
+#
+# ONE-TIME SETUP (per machine):
+#   pip install pre-commit detect-secrets
+#   pre-commit install
+#   detect-secrets scan > .secrets.baseline
+#
+# That last command has to be run on your own computer, against your
+# own copy of the project, because it needs to scan the files you
+# actually have right now. It creates a file called
+# .secrets.baseline. That file is just a list of things the scanner
+# looked at and confirmed are safe, not real secrets, just text
+# that happens to look like one. Commit that file too.
+#
+# AFTER SETUP:
+# From now on, every `git commit` runs this check by itself, with no
+# extra steps from you. If it ever flags something real, remove that
+# secret from the file and, if it was already live anywhere, replace
+# it with a new one before committing again.
+# ==
+
+repos:
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ["--baseline", ".secrets.baseline"]
+        exclude: >
+          (?x)^(
+            raw_data/external_olist/.*|
+            \.git/.*
+          )$
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=5000"]
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: trailing-whitespace

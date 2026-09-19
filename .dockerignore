@@ -1,0 +1,27 @@
+# Keeps the build context small and fast. Neither service's Dockerfile
+# actually needs any of this copied in, raw_data/, cleaned_data/, and
+# outputs/ are mounted in as volumes at runtime instead (see
+# docker-compose.yml), and everything else here is either real customer
+# data, git history, or local dev clutter that has no business being
+# baked into an image.
+.git/
+raw_data/
+cleaned_data/
+outputs/
+assets/
+tests/
+.pytest_cache/
+__pycache__/
+**/__pycache__/
+*.pyc
+.venv/
+venv/
+warehouse/*.duckdb
+dbt_seamark/target/
+dbt_seamark/logs/
+dbt_seamark/dbt_packages/
+.env
+**/.env
+supabase/
+stock_alerts/
+shopify_sync/

@@ -1,0 +1,2 @@
+overlap_days,predicted_total_gbp,predicted_lower_gbp,predicted_upper_gbp,actual_total_gbp,error_gbp,error_pct,overprediction_multiple,avg_margin_pct_used,capital_at_risk_gbp
+41,110.37,-504.19,726.62,417.27,-306.9,-73.5,0.3,63.8,

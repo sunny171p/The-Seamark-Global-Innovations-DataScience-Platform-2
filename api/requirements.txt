@@ -1,0 +1,4 @@
+# See requirements.txt at the project root for why these are ranges,
+# not exact pins.
+flask>=3.0,<4.0
+pandas>=2.2,<3.0

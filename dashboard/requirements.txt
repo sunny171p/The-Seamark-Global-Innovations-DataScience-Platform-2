@@ -1,0 +1,8 @@
+# See requirements.txt at the project root for why these are ranges,
+# not exact pins.
+streamlit>=1.35,<2.0
+pandas>=2.2,<3.0
+plotly>=5.20,<6.0
+openpyxl>=3.1,<4.0
+supabase>=2.4,<3.0
+python-dotenv>=1.0,<2.0

@@ -1,0 +1,56 @@
+# ==
+# ci.yml
+# Author: Sunday Emmanuel Azeez
+# The Seamark Global Innovations project 2
+# ==
+#
+# WHY THIS EXISTS:
+# Runs the real test suite (tests/) against the real, committed
+# non-PII data on every push and pull request to main,  A
+# handful of tests that need real customer data (raw_data/orders_export.csv,
+# raw_data/customers_export.csv, and their cleaned_data/*_clean.csv
+# derivatives) skip cleanly here with an explicit reason -- those files
+# are gitignored on purpose (see the root .gitignore and
+# DATA_PROVENANCE.md) since they hold real emails and names, so a
+# fresh checkout, including this one, never has them. See
+# tests/conftest.py's skip_if_missing() for exactly how that's handled.
+#
+# THE LINT STEP IS ADVISORY, NOT A GATE, FOR NOW:
+# It reports real issues (undefined names, unused imports) without
+# failing the build, because this codebase has never been linted
+# before and it would be dishonest to claim a strict gate passes
+# without having actually run one against the whole thing first. Once
+# a first pass has cleaned up whatever it finds, this can be tightened
+# into a real blocking check.
+# ==
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run test suite
+        run: python -m pytest tests/ -v
+
+      - name: Lint (advisory -- reports issues, doesn't fail the build yet)
+        continue-on-error: true
+        run: |
+          pip install ruff
+          ruff check --select F .

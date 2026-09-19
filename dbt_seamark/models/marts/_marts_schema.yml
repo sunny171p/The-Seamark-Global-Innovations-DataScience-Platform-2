@@ -1,0 +1,17 @@
+version: 2
+
+models:
+  - name: mart_category_sales_mix
+    description: >
+      Catalog count versus real units sold and revenue, per category.
+      A second, SQL-based answer to the same question
+      analytics/09_catalog_vs_sales_mix.py already answers in pandas,
+      built to be checked against it, not to replace it.
+    columns:
+      - name: category
+        tests:
+          - not_null
+          - unique
+      - name: catalog_product_count
+        tests:
+          - not_null
