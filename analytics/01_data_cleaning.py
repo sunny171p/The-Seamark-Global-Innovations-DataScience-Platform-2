@@ -165,6 +165,42 @@ print("[Products] Saved to cleaned_data/products_clean.csv")
 # quiet inflation this project has been built to catch, not repeat.
 # --
 
+# --
+# EXCLUDING ORDERS THAT NEVER ACTUALLY COLLECTED PAYMENT
+# --
+# A real webhook test caught a real gap here (see CASE_STUDY.md):
+# Shopify's own "send test notification" button fires a real, fixed
+# example order back at whatever's listening, and that example order
+# comes back with Financial Status "voided" -- its payment
+# authorization was cancelled before it was ever captured, so no
+# money changed hands. Nothing here checked for that before, so if
+# pipeline.py had been re-run right after that test without anyone
+# noticing, that fake order would have folded straight into
+# orders_clean.csv indistinguishable from a real sale.
+#
+# "voided" and "expired" both mean the same thing regardless of
+# whether the order behind them is a genuine customer order or a test
+# one: payment was never actually collected, so neither belongs in
+# real revenue or order counts. This is a blanket rule about what
+# Financial Status itself means, not a special case written only for
+# test data -- a real order that ended up voided for a real reason (a
+# card declined after checkout, say) shouldn't be counted as a sale
+# either.
+NON_REVENUE_STATUSES = {'voided', 'expired'}
+
+excluded_mask = raw_orders['Financial Status'].astype(str).str.lower().isin(NON_REVENUE_STATUSES)
+excluded_orders = raw_orders.loc[excluded_mask, ['Name', 'Financial Status']].drop_duplicates()
+
+if len(excluded_orders):
+    print(f"\n[Orders] Excluding {len(excluded_orders)} order(s) with no completed payment "
+          f"(Financial Status voided/expired -- never real revenue, test or otherwise):")
+    for _, _excl_row in excluded_orders.iterrows():
+        print(f"  {_excl_row['Name']}: {_excl_row['Financial Status']}")
+else:
+    print("\n[Orders] No voided/expired orders found in this export -- nothing excluded.")
+
+raw_orders = raw_orders.loc[~excluded_mask].reset_index(drop=True)
+
 order_level_columns = [
     'Name', 'Email', 'Financial Status', 'Created at', 'Currency',
     'Subtotal', 'Shipping', 'Taxes', 'Total',
