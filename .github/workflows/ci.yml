@@ -15,6 +15,23 @@
 # fresh checkout, including this one, never has them. See
 # tests/conftest.py's skip_if_missing() for exactly how that's handled.
 #
+# THE SECOND JOB, pipeline-smoke-test, IS DIFFERENT ON PURPOSE:
+# The `test` job below only checks files that were already sitting in
+# the repo from someone's last real local run -- it never actually
+# calls `python pipeline.py` itself, so a change that broke the
+# pipeline's own code (not its saved output) could still pass CI. This
+# second job closes that gap: it drops in two small, obviously-made-up
+# order/customer files (see tests/fixtures/ci_sample_data/README.md --
+# they're clearly fake, used only so the pipeline has something with
+# the right shape to run against) and actually runs the real
+# pipeline.py against them, end to end, inside the disposable GitHub
+# Actions checkout. Nothing here ever touches the real committed
+# cleaned_data/ or outputs/, and nothing this job computes is ever
+# presented anywhere as a real Seamark finding -- its only job is to
+# fail loudly the moment the pipeline itself stops running cleanly.
+# pipeline.py now exits non-zero on any stage failure specifically so
+# this job can actually detect that, instead of always reporting green.
+#
 # THE LINT STEP IS ADVISORY, NOT A GATE, FOR NOW:
 # It reports real issues (undefined names, unused imports) without
 # failing the build, because this codebase has never been linted
@@ -54,3 +71,24 @@ jobs:
         run: |
           pip install ruff
           ruff check --select F .
+
+  pipeline-smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Drop in made-up sample orders/customers (see tests/fixtures/ci_sample_data/README.md)
+        run: |
+          cp tests/fixtures/ci_sample_data/orders_export.csv raw_data/orders_export.csv
+          cp tests/fixtures/ci_sample_data/customers_export.csv raw_data/customers_export.csv
+
+      - name: Run the real pipeline end to end against that sample data
+        run: python pipeline.py
