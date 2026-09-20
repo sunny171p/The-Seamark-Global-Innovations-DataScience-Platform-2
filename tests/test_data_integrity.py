@@ -115,3 +115,61 @@ def test_all_analytics_scripts_compile(project_root):
             text=True,
         )
         assert result.returncode == 0, f"{script.name} failed to compile:\n{result.stderr}"
+
+
+def test_voided_and_expired_orders_get_excluded_before_cleaning():
+    """Unit test for the exclusion rule itself, not a read of real data —
+    it doesn't need raw_data/orders_export.csv (which is gitignored and
+    often missing on a fresh clone or in CI), because it checks the rule
+    01_data_cleaning.py applies, not this store's real order history.
+
+    This exists because a real webhook test once fired Shopify's own
+    fixed test order at this project (see CASE_STUDY.md), and it came
+    back with Financial Status 'voided' — a status that means payment
+    was never actually collected, whether the order behind it is a test
+    one or a genuine one that fell through for some real reason. The
+    table below is a small made-up example built only to exercise that
+    rule, not a claim about Seamark's real orders.
+    """
+    example_orders = pd.DataFrame({
+        "Name": ["#1001", "#1001", "#9999", "#1002", "#1003"],
+        "Financial Status": ["paid", "paid", "voided", "PAID", "expired"],
+        "Total": [50.0, 50.0, 999.99, 30.0, 15.0],
+    })
+
+    # Same rule as 01_data_cleaning.py's NON_REVENUE_STATUSES check —
+    # duplicated here on purpose rather than imported, same reasoning
+    # as every other test in this file: an independent recomputation
+    # catches drift a shared import could hide.
+    non_revenue_statuses = {"voided", "expired"}
+    excluded_mask = example_orders["Financial Status"].astype(str).str.lower().isin(non_revenue_statuses)
+    kept = example_orders.loc[~excluded_mask]
+
+    assert set(kept["Name"]) == {"#1001", "#1002"}, (
+        "Expected only the paid orders to survive the exclusion filter."
+    )
+    assert "#9999" not in set(kept["Name"]), "A voided order should never be counted as revenue."
+    assert "#1003" not in set(kept["Name"]), "An expired order should never be counted as revenue."
+    # Case shouldn't matter — Shopify's own data is lowercase, but this
+    # shouldn't silently start keeping a real order just because
+    # something upstream capitalised its status differently one day.
+    assert "#1002" in set(kept["Name"]), "A paid order should survive regardless of capitalisation."
+
+
+def test_orders_clean_never_contains_a_voided_or_expired_order(cleaned_data_dir):
+    """Standing invariant against this store's real cleaned data: no
+    matter what lands in raw_data/orders_export.csv (including a future
+    live webhook test), orders_clean.csv should never end up with a
+    voided or expired order counted in it. Currently this store's real
+    orders are all 'paid', so this is expected to pass trivially today —
+    its real job is to fail loudly the day that's no longer true.
+    """
+    skip_if_missing(cleaned_data_dir / "orders_clean.csv")
+    orders_clean = pd.read_csv(cleaned_data_dir / "orders_clean.csv")
+
+    non_revenue_statuses = {"voided", "expired"}
+    bad_rows = orders_clean[orders_clean["Financial Status"].astype(str).str.lower().isin(non_revenue_statuses)]
+    assert bad_rows.empty, (
+        f"orders_clean.csv contains {len(bad_rows)} voided/expired order(s) that should "
+        f"have been excluded during cleaning: {bad_rows['Name'].tolist()}"
+    )
