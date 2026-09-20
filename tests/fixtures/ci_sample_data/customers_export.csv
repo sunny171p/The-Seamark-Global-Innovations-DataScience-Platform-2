@@ -1,0 +1,4 @@
+Customer ID,First Name,Last Name,Email,Default Address Country Code,Total Spent,Total Orders
+90000001,Sample,Buyer One,sample.buyer1@example.test,GB,44.99,1
+90000002,Sample,Buyer Two,sample.buyer2@example.test,GB,128.99,1
+90000003,Sample,Buyer Three,sample.buyer3@example.test,NG,22.99,1

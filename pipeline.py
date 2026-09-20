@@ -173,3 +173,9 @@ else:
     log.warning("  - Run the failed stage individually to see the full error")
 
 log.info("=" * 62)
+
+# A non-zero exit code here is what actually lets CI (or anyone else
+# scripting this) tell a real failure apart from a clean run -- before
+# this, the process always exited 0 even when every single stage
+# failed, which meant nothing outside this log file could ever notice.
+sys.exit(1 if fail_count > 0 else 0)
