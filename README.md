@@ -1,6 +1,6 @@
 # Seamark Global Innovations — Post-Launch Data Science Project (Project 2)
 
-[![CI](https://github.com/sunny171p/Seamark-DataScience-Platform-2/actions/workflows/ci.yml/badge.svg)](https://github.com/sunny171p/Seamark-DataScience-Platform-2/actions/workflows/ci.yml)
+[![CI](https://github.com/sunny171p/The-Seamark-Global-Innovations-DataScience-Platform-2/actions/workflows/ci.yml/badge.svg)](https://github.com/sunny171p/The-Seamark-Global-Innovations-DataScience-Platform-2/actions/workflows/ci.yml)
 
 Author: Sunday Emmanuel Azeez
 
