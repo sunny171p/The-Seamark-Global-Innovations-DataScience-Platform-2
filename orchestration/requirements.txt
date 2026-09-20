@@ -1,0 +1,6 @@
+# Only needed to run orchestration/prefect_flow.py -- not needed for
+# pipeline.py, the dashboard, the API, or anything else in this
+# project. Same reasoning as dashboard/requirements.txt and
+# api/requirements.txt: most people running this only need one piece,
+# so each piece keeps its own list instead of one giant shared file.
+prefect>=3.0,<4.0
