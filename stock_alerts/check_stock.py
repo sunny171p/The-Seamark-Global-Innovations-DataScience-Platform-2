@@ -66,7 +66,53 @@ OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 
 SHOPIFY_STORE_DOMAIN = os.environ.get("SHOPIFY_STORE_DOMAIN")
 SHOPIFY_ADMIN_API_ACCESS_TOKEN = os.environ.get("SHOPIFY_ADMIN_API_ACCESS_TOKEN")
+SHOPIFY_CLIENT_ID = os.environ.get("SHOPIFY_CLIENT_ID")
+SHOPIFY_CLIENT_SECRET = os.environ.get("SHOPIFY_CLIENT_SECRET")
 SHOPIFY_API_VERSION = os.environ.get("SHOPIFY_API_VERSION", "2026-07")
+
+# Same fallback shopify_sync/refresh_raw_data.py already uses: a
+# permanent shpat_ token in .env is used directly if present; otherwise
+# SHOPIFY_CLIENT_ID + SHOPIFY_CLIENT_SECRET (the credentials this
+# project's Shopify sync add-on already has configured) are exchanged
+# for a real access token here, once per run. That exchanged token is
+# short-lived, so it is fetched fresh each run rather than cached to disk.
+_access_token_cache = {"token": None}
+
+
+def _get_access_token() -> str:
+    if SHOPIFY_ADMIN_API_ACCESS_TOKEN:
+        return SHOPIFY_ADMIN_API_ACCESS_TOKEN
+
+    if _access_token_cache["token"]:
+        return _access_token_cache["token"]
+
+    if not SHOPIFY_STORE_DOMAIN or not SHOPIFY_CLIENT_ID or not SHOPIFY_CLIENT_SECRET:
+        _fail(
+            "Need either SHOPIFY_ADMIN_API_ACCESS_TOKEN, or SHOPIFY_STORE_DOMAIN + "
+            "SHOPIFY_CLIENT_ID + SHOPIFY_CLIENT_SECRET, set in stock_alerts/.env — see README.md."
+        )
+
+    resp = requests.post(
+        f"https://{SHOPIFY_STORE_DOMAIN}/admin/oauth/access_token",
+        data={
+            "grant_type": "client_credentials",
+            "client_id": SHOPIFY_CLIENT_ID,
+            "client_secret": SHOPIFY_CLIENT_SECRET,
+        },
+        timeout=30,
+    )
+    if resp.status_code != 200:
+        _fail(
+            f"Couldn't exchange the Client ID/Secret for an access token — "
+            f"HTTP {resp.status_code}: {resp.text[:500]}\n"
+            f"Double-check SHOPIFY_STORE_DOMAIN, SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET in .env."
+        )
+    token = resp.json().get("access_token")
+    if not token:
+        _fail(f"Shopify's response didn't include an access_token: {resp.text[:500]}")
+
+    _access_token_cache["token"] = token
+    return token
 
 ALERT_EMAIL_FROM = os.environ.get("ALERT_EMAIL_FROM")
 ALERT_EMAIL_TO = os.environ.get("ALERT_EMAIL_TO")
@@ -87,15 +133,15 @@ def fetch_live_inventory() -> pd.DataFrame:
     Shopify-tracked variants. Handle is the same identifier Shopify
     uses in the CSV export this project's other stages already read,
     so no separate SKU-matching step is needed to join the two."""
-    if not SHOPIFY_STORE_DOMAIN or not SHOPIFY_ADMIN_API_ACCESS_TOKEN:
+    if not SHOPIFY_STORE_DOMAIN:
         _fail(
-            "SHOPIFY_STORE_DOMAIN / SHOPIFY_ADMIN_API_ACCESS_TOKEN not set. "
-            "Copy stock_alerts/.env.example to stock_alerts/.env and fill them in — see README.md."
+            "SHOPIFY_STORE_DOMAIN not set. Copy stock_alerts/.env.example to "
+            "stock_alerts/.env and fill it in — see README.md."
         )
 
     url = f"https://{SHOPIFY_STORE_DOMAIN}/admin/api/{SHOPIFY_API_VERSION}/graphql.json"
     headers = {
-        "X-Shopify-Access-Token": SHOPIFY_ADMIN_API_ACCESS_TOKEN,
+        "X-Shopify-Access-Token": _get_access_token(),
         "Content-Type": "application/json",
     }
 

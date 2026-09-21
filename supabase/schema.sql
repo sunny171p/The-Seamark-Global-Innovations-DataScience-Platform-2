@@ -215,6 +215,27 @@ create table if not exists external_category_benchmark (
     synced_at timestamptz default now()
 );
 
+-- Durable landing zone for the Shopify order webhook (webhook_listener.py).
+-- Exists because the webhook listener is deployed on Render's free tier,
+-- which uses ephemeral disk — any file written to raw_data/webhook_events/
+-- locally is lost the next time the service restarts or redeploys. Landing
+-- each verified event here instead means a real order survives a restart
+-- even if the local JSON copy doesn't. fold_webhook_events.py reads
+-- unfolded rows from here (folded = false), turns them into orders_clean
+-- rows the same way it always has, then marks them folded — same
+-- land-then-fold-as-a-separate-step pattern CASE_STUDY.md describes, just
+-- backed by a table that survives a restart instead of a file that might not.
+create table if not exists webhook_events (
+    id bigint generated always as identity primary key,
+    shopify_order_id bigint,
+    order_name text,
+    topic text,
+    payload jsonb not null,
+    received_at timestamptz default now(),
+    folded boolean default false,
+    folded_at timestamptz
+);
+
 -- Row Level Security: left disabled by default because this is an internal
 -- analytics store with no end-user auth in front of it yet. If this
 -- Supabase project is ever shared beyond the team, enable RLS and add

@@ -83,6 +83,28 @@ EVENTS_DIR.mkdir(parents=True, exist_ok=True)
 
 WEBHOOK_SECRET = os.environ.get("SHOPIFY_WEBHOOK_SECRET", "")
 
+# Local JSON files under EVENTS_DIR are kept for local runs (easy to eyeball
+# while testing), but they do NOT survive this listener running on Render's
+# free tier -- that's ephemeral disk, wiped on every restart/redeploy. A
+# Supabase service-role client is the durable copy: if it's configured,
+# every verified event is landed there too, and that's what
+# fold_webhook_events.py reads from when running against a deployment
+# rather than a local checkout. See supabase/schema.sql's webhook_events
+# table for why.
+_supabase_client = None
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
+    try:
+        from supabase import create_client
+        _supabase_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    except ImportError:
+        logging.getLogger("webhook_listener").warning(
+            "SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY are set but the supabase "
+            "package isn't installed -- landing to local files only. "
+            "pip install supabase to enable the durable Supabase copy."
+        )
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-7s  %(message)s",
@@ -125,10 +147,39 @@ def handle_order_webhook():
     order_id = order.get("id", "unknown")
     order_name = order.get("name", "unknown")
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out_path = EVENTS_DIR / f"{timestamp}_{order_id}.json"
-    out_path.write_text(json.dumps(order, indent=2), encoding="utf-8")
 
-    log.info("Landed order %s (id %s) -> %s", order_name, order_id, out_path.name)
+    # Best-effort local copy -- fine on a local run, harmless but not
+    # durable on Render's free tier (see the Supabase note above).
+    try:
+        out_path = EVENTS_DIR / f"{timestamp}_{order_id}.json"
+        out_path.write_text(json.dumps(order, indent=2), encoding="utf-8")
+        log.info("Landed order %s (id %s) -> local file %s", order_name, order_id, out_path.name)
+    except OSError as exc:
+        log.warning("Could not write local landing file for order %s: %s", order_name, exc)
+
+    # Durable copy -- this is the one fold_webhook_events.py trusts when
+    # running against a deployment, since it survives a Render restart.
+    if _supabase_client is not None:
+        try:
+            _supabase_client.table("webhook_events").insert({
+                "shopify_order_id": order_id if isinstance(order_id, int) else None,
+                "order_name": order_name,
+                "topic": request.headers.get("X-Shopify-Topic", ""),
+                "payload": order,
+            }).execute()
+            log.info("Landed order %s (id %s) -> Supabase webhook_events", order_name, order_id)
+        except Exception as exc:
+            # Don't fail the webhook over this -- Shopify will retry a
+            # non-200 response, and the local file above already has the
+            # event. Log it loudly so a real outage doesn't go unnoticed.
+            log.error("Could not write order %s to Supabase webhook_events: %s", order_name, exc)
+    elif not (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY):
+        log.warning(
+            "SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY not set -- order %s only landed "
+            "locally, which will NOT survive a restart if this is running on Render's "
+            "free tier. Set both in .env to enable the durable copy.", order_name
+        )
+
     return {"status": "received"}, 200
 
 
@@ -143,6 +194,8 @@ if __name__ == "__main__":
             "SHOPIFY_WEBHOOK_SECRET is not set in shopify_sync/.env, "
             "every incoming webhook will be rejected until it is."
         )
-    port = int(os.environ.get("WEBHOOK_PORT", "5051"))
+    # Render (and most hosts) set PORT automatically; WEBHOOK_PORT stays
+    # for running this locally, where 5051 is what ngrok etc. expect.
+    port = int(os.environ.get("PORT", os.environ.get("WEBHOOK_PORT", "5051")))
     log.info("Listening for Shopify order webhooks on port %d", port)
     app.run(host="0.0.0.0", port=port, debug=False)
