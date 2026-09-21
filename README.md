@@ -108,6 +108,16 @@ python -m pytest tests/ -v
 
 The test suite doesn't trust the pipeline's own arithmetic. Every test file recomputes its numbers independently from `raw_data/`/`cleaned_data/` and checks that the saved output agrees. So a passing suite means the outputs are actually correct, not just that the scripts ran without crashing.
 
+**A fresh clone won't have `raw_data/orders_export.csv` or `raw_data/customers_export.csv`.** Those two carry real customer names and emails, so they're gitignored on purpose -- see `DATA_PROVENANCE.md` for what every raw file is and `CASE_STUDY.md` for why real customer data gets kept out of git specifically. Two ways to actually run the pipeline without them:
+
+- **Your own data.** Export your own store's orders and customers from Shopify Admin (native export format) and drop them into `raw_data/` under those exact filenames.
+- **Made-up data, so you can try this right now.** Copy the same synthetic files the CI workflow already runs against on every push:
+  ```
+  cp tests/fixtures/ci_sample_data/orders_export.csv raw_data/orders_export.csv
+  cp tests/fixtures/ci_sample_data/customers_export.csv raw_data/customers_export.csv
+  ```
+  Then `python pipeline.py` runs the real code end to end against three made-up orders referencing real product SKUs -- see `tests/fixtures/ci_sample_data/README.md` for exactly what's in them and why. This is the same thing `.github/workflows/ci.yml`'s `pipeline-smoke-test` job does on every push, so you know in advance it works.
+
 ## Quick start — dashboard
 
 ```
@@ -133,10 +143,11 @@ Everything above reads a dated CSV export. This one's different: it checks your 
 
 ## If something fails on a fresh machine
 
-1. Check you're installing into the same Python environment you're running scripts from. Running `pip install X` in one environment and `python script.py` in another is the most common cause of a `ModuleNotFoundError` that looks like a real bug but isn't.
-2. Run the pipeline stage that failed on its own (`cd analytics && python 0X_whatever.py`) to see the full traceback, rather than the trimmed error `pipeline.py` prints.
-3. Run stages in order. `pipeline.py` does this for you automatically, but running an analytics script by hand out of order (Stage 4 before Stage 1, say) will fail, because later stages read earlier stages' output files.
-4. Nothing here reads from or writes to any path outside this project folder, and nothing is hardcoded to a specific machine or OS. If you hit a path error, it's almost certainly #3, not some difference in your environment.
+1. If the failure is a `FileNotFoundError` for `raw_data/orders_export.csv` or `raw_data/customers_export.csv`, that's not a bug -- see "Quick start -- analytics pipeline only" above. Those two are gitignored on purpose and a fresh clone never has them.
+2. Check you're installing into the same Python environment you're running scripts from. Running `pip install X` in one environment and `python script.py` in another is the most common cause of a `ModuleNotFoundError` that looks like a real bug but isn't.
+3. Run the pipeline stage that failed on its own (`cd analytics && python 0X_whatever.py`) to see the full traceback, rather than the trimmed error `pipeline.py` prints.
+4. Run stages in order. `pipeline.py` does this for you automatically, but running an analytics script by hand out of order (Stage 4 before Stage 1, say) will fail, because later stages read earlier stages' output files.
+5. Nothing here reads from or writes to any path outside this project folder, and nothing is hardcoded to a specific machine or OS. If you hit a path error, it's almost certainly #4, not some difference in your environment.
 
 ## Honest scope — read before trusting a number for something real
 
