@@ -15,6 +15,8 @@ Both of these run against this project's own real, non-PII data -- the same comm
 
 The API is on a free instance and spins down after inactivity, so the first request after a while can take up to a minute to wake it back up -- that's Render's free tier, not a bug.
 
+Both of these redeploy automatically on every push to `main` -- a webhook on this repo triggers each one, so what's live always matches what's on GitHub, not a stale snapshot from whenever they were first set up.
+
 ## Dashboard
 
 These are full-page captures of every section in `streamlit run dashboard/app.py`, taken from a live run against this project's own real data. No mockups. If you want to regenerate them after a data refresh, see `dashboard/capture_screenshots.py`.
