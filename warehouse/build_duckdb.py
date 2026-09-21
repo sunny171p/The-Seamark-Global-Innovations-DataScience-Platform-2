@@ -25,26 +25,39 @@
 # real orders do not need a hosted data warehouse, but the project is
 # still built the way a bigger one would need to work.
 #
-# IDEMPOTENT, ON PURPOSE, AND NOW ACTUALLY GUARANTEED:
+# IDEMPOTENT, ON PURPOSE, ACTUALLY GUARANTEED, AND A REAL BUG THIS
+# ALREADY CAUGHT ONCE:
 # Running this script twice in a row against the same CSVs produces the
 # exact same warehouse, not just the same-looking one. Every table is
 # loaded with CREATE OR REPLACE, so re-running never duplicates a single
-# row -- that part was already true before this note was added. What
-# was missing: if a CSV that used to exist got renamed or removed (an
-# old outputs/ file from a stage that no longer runs, say), its table
-# stayed behind in seamark.duckdb forever, because nothing ever told the
-# warehouse to forget it. Two consecutive runs of the OLD version of
-# this script could therefore leave two DIFFERENT sets of tables behind,
-# depending on what used to exist -- not actually idempotent, just
-# usually close enough not to notice on a project this small. This
-# version fixes that directly: every run now drops any table that
-# doesn't correspond to a CSV file that exists right now, so the
-# warehouse always exactly mirrors the current cleaned_data/ and
-# outputs/ folders, however many times you run it, and however the
-# source files have changed since the last run. tests/test_warehouse.py
-# proves this automatically -- two consecutive builds compared table for
-# table and row for row -- rather than asking anyone to trust this
-# comment.
+# row. Every run also drops any table that no longer has a matching CSV
+# (an old outputs/ file from a stage that no longer runs, say), so a
+# renamed or removed CSV's table doesn't sit in seamark.duckdb forever.
+#
+# The first version of that cleanup logic used DuckDB's SHOW TABLES to
+# decide what to drop -- which, it turns out, lists views as well as
+# real tables. dbt_seamark/ builds its own views (stg_order_line_items
+# and friends, see dbt_seamark/models/) into this exact same
+# seamark.duckdb file, and the moment this script's cleanup logic saw
+# one of those views sitting there with no matching CSV, it tried to
+# DROP TABLE it -- which DuckDB correctly refuses, because it's a VIEW,
+# not a TABLE, and the whole run crashed. tests/test_warehouse.py, at
+# the time, only ever built against a brand-new, empty throwaway
+# database, so it never had a dbt view sitting in it to catch this --
+# it was proven idempotent against a warehouse that had never met dbt,
+# which is not the real warehouse anyone actually uses day to day. This
+# only surfaced because it was run for real, twice, against the actual
+# shared seamark.duckdb after `dbt run` had already populated it with
+# views -- exactly the scenario the earlier test coverage missed.
+#
+# Fixed by only ever treating real base tables as drop candidates
+# (information_schema.tables filtered to table_type = 'BASE TABLE'),
+# never views -- this script now can't see or touch a dbt view at all,
+# in either direction. tests/test_warehouse.py has a test for this
+# specific scenario now: it creates a throwaway VIEW with a name that
+# matches no CSV, runs a build, and asserts the view is still there
+# and unharmed afterward, so this can't quietly break the same way
+# twice.
 #
 # WHY THIS ISN'T "INCREMENTAL" LOADING, ON PURPOSE:
 # See warehouse/README.md for the full reasoning. Short version: every
@@ -68,10 +81,12 @@
 #
 # That leaves warehouse/seamark.duckdb sitting next to this script,
 # gitignored, since it is a derived, rebuildable file, not raw data. Run
-# it again any time -- including with a completely different set of
+# it again any time -- including after `dbt run` has added its own
+# views to the same file, or with a completely different set of
 # cleaned_data/outputs files than last time -- and it converges to a
-# warehouse that matches exactly what's on disk right now, nothing left
-# over from before.
+# warehouse whose CSV-derived tables match exactly what's on disk right
+# now, without ever touching anything dbt (or anyone else) has built on
+# top of it.
 
 import logging
 import sys
@@ -103,6 +118,22 @@ log = logging.getLogger("build_duckdb")
 def _table_name_for(csv_path: Path) -> str:
     """products_clean.csv -> products_clean, funnel_summary.csv -> funnel_summary."""
     return csv_path.stem
+
+
+def _existing_base_tables(con: duckdb.DuckDBPyConnection) -> set[str]:
+    """Real tables only -- never a view. dbt_seamark/ builds its own
+    views into this same database file (see dbt_seamark/profiles.yml),
+    and this script must never be able to see, let alone drop, one of
+    those. SHOW TABLES lists views too, which is exactly what caused a
+    real crash here once already -- see the IDEMPOTENT header note
+    above -- so this queries information_schema directly, filtered to
+    table_type = 'BASE TABLE', instead.
+    """
+    rows = con.execute(
+        "SELECT table_name FROM information_schema.tables "
+        "WHERE table_type = 'BASE TABLE' AND table_schema = 'main'"
+    ).fetchall()
+    return {row[0] for row in rows}
 
 
 def load_csvs_from(con: duckdb.DuckDBPyConnection, folder: Path, source_label: str) -> tuple[int, int]:
@@ -140,8 +171,10 @@ def load_csvs_from(con: duckdb.DuckDBPyConnection, folder: Path, source_label: s
 
 
 def _drop_stale_tables(con: duckdb.DuckDBPyConnection, expected_tables: set[str]) -> list[str]:
-    """Drops any table in the database that doesn't correspond to a CSV
-    file that exists right now. This is what makes re-running this
+    """Drops any real TABLE in the database that doesn't correspond to a
+    CSV file that exists right now. Never touches a view -- see
+    _existing_base_tables's own docstring for why that distinction is
+    load-bearing, not cosmetic. This is what makes re-running this
     script actually idempotent, not just non-duplicating: without it, a
     table from a CSV that was later renamed or removed would sit in
     seamark.duckdb forever, so the warehouse's table list would depend
@@ -149,7 +182,7 @@ def _drop_stale_tables(con: duckdb.DuckDBPyConnection, expected_tables: set[str]
     contents of cleaned_data/ and outputs/. Returns the names dropped,
     so the caller can log them.
     """
-    existing = {row[0] for row in con.execute("SHOW TABLES").fetchall()}
+    existing = _existing_base_tables(con)
     stale = sorted(existing - expected_tables - {METADATA_TABLE})
     for table_name in stale:
         con.execute(f'DROP TABLE "{table_name}"')
@@ -193,15 +226,19 @@ def build(db_path: Path = DB_PATH) -> dict:
         [built_at, files_loaded, rows_loaded],
     )
 
-    tables = con.execute("SHOW TABLES").fetchall()
+    # Base tables only, same as the cleanup above -- this summary (and
+    # what gets logged) is about what THIS script manages. A dbt view
+    # sitting in the same file is real and useful, just not this
+    # script's to report on.
+    tables = sorted(_existing_base_tables(con))
     con.close()
 
     log.info("Done. %d table(s) loaded into %s (%d total rows)", files_loaded, db_path.name, rows_loaded)
-    log.info("Tables now available: %s", ", ".join(t[0] for t in tables) if tables else "(none)")
+    log.info("Tables now available: %s", ", ".join(tables) if tables else "(none)")
     log.info('Try it: duckdb warehouse/seamark.duckdb -c "SELECT * FROM funnel_summary;"')
 
     return {
-        "tables": sorted(t[0] for t in tables),
+        "tables": tables,
         "files_loaded": files_loaded,
         "rows_loaded": rows_loaded,
         "dropped": dropped,

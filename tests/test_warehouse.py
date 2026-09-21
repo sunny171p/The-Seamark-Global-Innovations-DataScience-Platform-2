@@ -108,6 +108,50 @@ def test_stale_table_is_dropped_on_next_build(tmp_path):
 
 
 # --
+# A dbt VIEW living in the same database (see dbt_seamark/profiles.yml --
+# it reads from this exact seamark.duckdb) must never be touched, even
+# when its name matches no CSV. This is the literal scenario that
+# crashed a real run once already: the old cleanup logic used SHOW
+# TABLES, which lists views too, then tried to DROP TABLE one -- DuckDB
+# correctly refuses that, because a view isn't a table, and the whole
+# build crashed against the real, dbt-populated seamark.duckdb. This
+# only ever surfaced on that real file, never against the throwaway
+# databases the other tests in this file build from scratch, since
+# those never have a dbt view sitting in them to begin with.
+# --
+
+def test_a_dbt_style_view_is_never_touched(tmp_path):
+    _skip_if_nothing_to_load()
+    db_path = tmp_path / "test_warehouse_view.duckdb"
+
+    build_duckdb.build(db_path)
+
+    # Simulate what dbt_seamark/ actually does to this file: build a
+    # VIEW, not a table, with a name that matches no CSV -- the same
+    # shape as stg_order_line_items and friends.
+    con = duckdb.connect(str(db_path))
+    con.execute('CREATE OR REPLACE VIEW "stg_a_dbt_style_view" AS SELECT 1 AS x')
+    con.close()
+
+    # Must not raise, and the view must still be exactly what it was.
+    result = build_duckdb.build(db_path)
+
+    assert "stg_a_dbt_style_view" not in result["dropped"]
+    assert "stg_a_dbt_style_view" not in result["tables"]  # it's a view, not a base table -- correctly absent from this list too
+
+    con = duckdb.connect(str(db_path))
+    view_row = con.execute('SELECT x FROM "stg_a_dbt_style_view"').fetchone()
+    still_a_view = con.execute(
+        "SELECT table_type FROM information_schema.tables WHERE table_name = ?",
+        ["stg_a_dbt_style_view"],
+    ).fetchone()
+    con.close()
+
+    assert view_row == (1,)
+    assert still_a_view == ("VIEW",)
+
+
+# --
 # The build's own record of itself is accurate, not just present
 # --
 

@@ -35,6 +35,29 @@ pip install -r requirements.txt
 python -m pytest tests/test_warehouse.py -v
 ```
 
+## A real bug this already caught once
+
+The stale-table cleanup above didn't ship right the first time. Its
+first version used DuckDB's `SHOW TABLES` to decide what to drop --
+which lists views as well as real tables. `dbt_seamark/` builds its own
+views (`stg_order_line_items` and others, see `dbt_seamark/models/`)
+into this exact same `seamark.duckdb` file, and the moment the cleanup
+logic saw one of those views with no matching CSV, it tried to
+`DROP TABLE` it. DuckDB correctly refuses that -- a view isn't a
+table -- and the whole build crashed.
+
+`tests/test_warehouse.py` didn't catch this before it shipped, because
+every test in it built against a brand-new, empty throwaway database --
+one that had never had `dbt run` build a view into it. The bug was only
+ever going to show up against the real, shared `seamark.duckdb`, after
+dbt had already populated it, which is exactly what happened the first
+time this was run for real. It's fixed now by only ever treating actual
+base tables as drop candidates (`information_schema.tables` filtered to
+`table_type = 'BASE TABLE'`), never views, and
+`test_a_dbt_style_view_is_never_touched` in `tests/test_warehouse.py`
+builds a throwaway view on purpose now to prove this specific scenario
+stays fixed.
+
 ## Why this isn't "incremental" loading, on purpose
 
 Every CSV this script reads is already a **full recomputation** from
