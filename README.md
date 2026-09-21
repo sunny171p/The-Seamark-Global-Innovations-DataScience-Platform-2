@@ -6,6 +6,15 @@ Author: Sunday Emmanuel Azeez
 
 This is a real-data analysis of Seamark's relaunched Shopify store. It covers product classification, pricing integrity, the checkout funnel and bot-traffic adjustment, forecast-vs-actual revenue, omnichannel visibility, and affiliate signups, all served through a numbered pipeline, a Flask API, and a Streamlit dashboard. Every number traces back to a real export listed in `DATA_PROVENANCE.md`. Nothing on the dashboard, in the API, or in `outputs/` is simulated. The point of this README is that anyone can clone it, install it, and run the whole thing without hitting an error, not just someone who's been following along the whole time.
 
+## Live demo
+
+Both of these run against this project's own real, non-PII data -- the same committed `cleaned_data/` and `outputs/` CSVs the pipeline produces, nothing simulated, nothing entered by hand:
+
+- **Dashboard:** https://the-seamark-global-innovations-datascience-platform-2-knkjlrym.streamlit.app
+- **API:** https://seamark-api.onrender.com (try `/health`, `/products`, `/forecast/summary`, `/pipeline/health`)
+
+The API is on a free instance and spins down after inactivity, so the first request after a while can take up to a minute to wake it back up -- that's Render's free tier, not a bug.
+
 ## Dashboard
 
 These are full-page captures of every section in `streamlit run dashboard/app.py`, taken from a live run against this project's own real data. No mockups. If you want to regenerate them after a data refresh, see `dashboard/capture_screenshots.py`.
