@@ -24,4 +24,6 @@ dbt_seamark/dbt_packages/
 **/.env
 supabase/
 stock_alerts/
-shopify_sync/
+# shopify_sync/ used to be excluded too -- api/'s Dockerfile never
+# needed it. shopify_sync/Dockerfile (the webhook listener) does,
+# so it can't be blanket-ignored here any more.
