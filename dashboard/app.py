@@ -627,7 +627,8 @@ elif section == "Affiliates":
             st.info("No per-affiliate detail available — check raw_data/uppromote_affiliates.xlsx.")
         else:
             st.dataframe(
-                affiliates[[c for c in ["email", "first_name", "last_name", "country", "program", "status", "verified", "login_count", "signup_source"] if c in affiliates.columns]],
+                # Contact details (email, names) are never shown, only programme fields.
+                affiliates[[c for c in ["affiliate_id", "country", "program", "status", "verified", "login_count", "signup_source"] if c in affiliates.columns]],
                 width='stretch',
                 height=360,
             )
