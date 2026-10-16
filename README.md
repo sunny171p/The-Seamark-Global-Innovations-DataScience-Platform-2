@@ -198,6 +198,28 @@ Everything above still works exactly as described, `pipeline.py`, the CSVs, the 
 
 **A real dependency graph, not just a fixed script order.** `pipeline.py` runs all ten stages one at a time, in one fixed order -- genuinely fine at this project's real size, but not how this would actually get run at a bigger one. `orchestration/prefect_flow.py` is a second way to run the exact same ten scripts, unchanged, using Prefect to express which stages can run at the same time because neither needs the other's output (five of them do, once Stage 1's done) and which genuinely have to wait their turn, plus an automatic retry on a transient failure instead of the whole run just dying. See `orchestration/README.md` for the actual dependency graph and how to run it, including an honest note on what could and couldn't be verified before this was called done.
 
+## Cash flow forecasting (a separate tool built on the same Shopify app)
+
+![Cash forecast dashboard (sample data)](assets/cash_forecast/dashboard.png)
+
+*The screenshot uses sample data, not Seamark's real figures.*
+
+Before writing any code for this one, I sat down to work out what actually worries small online sellers about money. I read through the Shopify Community forums and Reddit (r/shopify, r/ecommerce and r/smallbusinessuk), then went through reviews of the tools sellers already pay for, one by one: Shopify App Store reviews for profit apps like TrueProfit, BeProfit and A2X, G2 reviews, and cash flow tools like Float, Agicap and Cash Flow Frog. I also posted questions on Medium, DEV and Bluesky to hear from sellers and developers directly.
+
+The same problems kept coming up. Shopify holds or delays payouts and sellers only find out when the money doesn't arrive. VAT bills land as a surprise. It's hard to tell whether you can afford a stock order before you place it. Most tools show profit, not cash, and a store can be profitable on paper and still run out of money in the bank. The proper cash flow tools are built and priced for bigger companies.
+
+So I built a 13-week cash forecast for small UK sellers. It shows the lowest point your cash will reach and when, warns you before it drops below zero or below a safety buffer, and lets you test "what if my payout is two weeks late?" and "can I afford this stock order?" before committing. It also knows UK VAT due dates.
+
+**Shopify.** It reuses this project's Shopify app from the Dev Dashboard, with two extra read-only scopes (`read_shopify_payments_payouts` and `read_shopify_payments_accounts`). That lets it read payouts already paid, payouts on their way and the balance waiting to be paid out. It can't change anything in the store, and there are no CSV exports to download by hand.
+
+**Render.** The online version runs on Render, the same host as this project's API. It keeps the dashboard up 24/7 behind a password and rebuilds the forecast from Shopify whenever it's opened and is more than 30 minutes old. It can also rebuild the moment Shopify reports a paid order, through a signed webhook. The Shopify keys live in Render's settings, never in code.
+
+**Locally.** Windows Task Scheduler runs the same forecast every morning at 8:00 and keeps a log of each run. The bank balance only needs entering once; after that each new payout and planned cost is added to it automatically.
+
+**Why the code is in a private repository.** Everything else in this project is public under MIT, so anyone can copy it. The forecaster is different: I'm developing it into a paid Shopify app for other small sellers, so its code stays private while this README shows what it does and how it was built. The next steps are letting other stores install it through Shopify's normal install flow, giving each seller a simple form instead of a settings file, storing each store's data separately, and charging through Shopify's own billing. Before building all of that I want a handful of small sellers to try the current version and tell me whether it's worth paying for.
+
+It's plain Python with no third-party packages and has its own test suite (34 tests), covering the money maths, VAT dates, the Shopify connection, the balance roll-forward and the web service's password and webhook checks.
+
 ## License
 
 MIT — see `LICENSE`. Fork it, run it against your own store, adapt it for your own portfolio; the one condition is that the copyright notice in `LICENSE` stays intact in any copy.
